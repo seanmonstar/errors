@@ -1,0 +1,6 @@
+[package]
+name = "errors"
+version = "0.1.0"
+authors = ["Sean McArthur <sean@seanmonstar.com>"]
+
+[dependencies]
