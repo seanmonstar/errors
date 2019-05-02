@@ -1,5 +1,5 @@
 use std::fmt;
-use super::{Error, ErrorRef, StdError};
+use super::{BoxError, Error, ErrorRef};
 
 /// Wrap a value as an opaque `Error`.
 ///
@@ -13,11 +13,14 @@ use super::{Error, ErrorRef, StdError};
 /// assert_eq!(err.to_string(), "sound the alarm");
 /// assert!(err.source().is_none());
 /// ```
-pub fn opaque<D>(err: D) -> Error
+pub fn opaque<D>(err: D) -> BoxError
 where
     D: fmt::Debug + fmt::Display + Send + Sync + 'static,
 {
-    Opaque(err).into()
+    Wrapper {
+        message: err,
+        cause: None,
+    }.into()
 }
 
 /// Wrap an error with some additional message.
@@ -30,51 +33,209 @@ where
 /// assert_eq!(err.to_string(), "exploded");
 /// assert_eq!(err.source().unwrap().to_string(), "cat hair in generator");
 /// ```
-pub fn wrap<D, E>(msg: D, cause: E) -> Error
+pub fn wrap<D, E>(message: D, cause: E) -> BoxError
 where
     D: fmt::Debug + fmt::Display + Send + Sync + 'static,
-    E: Into<Error>,
+    E: Into<BoxError>,
 {
-    Wrapped(msg, cause.into()).into()
+    Wrapper {
+        message,
+        cause: Some(cause.into()),
+    }.into()
 }
 
-struct Opaque<D>(D);
-
-impl<D: fmt::Debug> fmt::Debug for Opaque<D> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
+pub(crate) fn wrap_ref<'a>(err: &'a dyn Error) -> impl Error + 'a {
+    WrapperRef {
+        message: err,
+        cause: err.source(),
     }
 }
 
-impl<D: fmt::Display> fmt::Display for Opaque<D> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
+struct Wrapper<D> {
+    message: D,
+    cause: Option<BoxError>,
+}
+
+struct WrapperRef<'a, D> {
+    message: D,
+    cause: Option<&'a ErrorRef>,
+}
+
+impl<D> Wrapper<D>
+where
+    D: fmt::Debug + fmt::Display + 'static,
+{
+    fn wrap_ref(&self) -> WrapperRef<&D> {
+        WrapperRef {
+            message: &self.message,
+            cause: self.source(),
+        }
     }
 }
 
-impl<D: fmt::Debug + fmt::Display> StdError for Opaque<D> {
-    // no source
-}
-
-struct Wrapped<D>(D, Error);
-
-impl<D: fmt::Debug> fmt::Debug for Wrapped<D> {
+impl<D> fmt::Debug for Wrapper<D>
+where
+    D: fmt::Debug + fmt::Display + 'static,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("")
-            .field(&self.0)
-            .field(&self.1)
-            .finish()
+        fmt::Debug::fmt(&self.wrap_ref(), f)
     }
 }
 
-impl<D: fmt::Display> fmt::Display for Wrapped<D> {
+impl<D> fmt::Display for Wrapper<D>
+where
+    D: fmt::Debug + fmt::Display + 'static,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
+        fmt::Display::fmt(&self.wrap_ref(), f)
     }
 }
 
-impl<D: fmt::Debug + fmt::Display> StdError for Wrapped<D> {
+impl<D> Error for Wrapper<D>
+where
+    D: fmt::Debug + fmt::Display + 'static,
+{
     fn source(&self) -> Option<&ErrorRef> {
-        Some(&*self.1)
+        self.cause.as_ref().map(|e| &**e as _)
+    }
+}
+
+impl<'a, D: fmt::Debug> fmt::Debug for WrapperRef<'a, D> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(ref cause) = self.cause {
+            f.debug_tuple("")
+                .field(&self.message)
+                .field(cause)
+                .finish()
+        } else {
+            fmt::Debug::fmt(&self.message, f)
+        }
+    }
+}
+
+impl<'a, D> fmt::Display for WrapperRef<'a, D>
+where
+    D: fmt::Debug + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // {:+} means print the chain
+        if f.sign_plus() {
+            // first message with no flags...
+            write!(f, "{}", self.message)?;
+            let joiner = if f.alternate() {
+                "\nCaused by: "
+            } else {
+                ": "
+            };
+            // precision flag signals max source chain iteration...
+            if let Some(max) = f.precision() {
+                for err in ::iter::sources(self).take(max) {
+                    f.write_str(joiner)?;
+                    write!(f, "{}", err)?;
+                }
+            } else {
+                for err in ::iter::sources(self) {
+                    f.write_str(joiner)?;
+                    write!(f, "{}", err)?;
+                }
+            }
+
+            Ok(())
+        } else {
+            // reset all formatter flags
+            write!(f, "{}", self.message)
+        }
+    }
+}
+
+impl<'a, D> Error for WrapperRef<'a, D>
+where
+    D: fmt::Debug + fmt::Display,
+{
+    fn source(&self) -> Option<&ErrorRef> {
+        self.cause.as_ref().map(|e| *e)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn display_default() {
+        let cause = "cat hair in generator";
+        let top = "ship exploded";
+
+        let op = super::opaque(cause);
+        assert_eq!(format!("{}", op), cause);
+
+        let wp = super::wrap(top, cause);
+        assert_eq!(format!("{}", wp), top);
+
+        let wp_op = super::wrap(top, op);
+        assert_eq!(format!("{}", wp_op), top);
+    }
+
+    #[test]
+    fn display_chain() {
+        let cause = "cat hair in generator";
+        let top = "ship exploded";
+
+        let op = super::opaque(cause);
+        assert_eq!(format!("{:+}", op), cause);
+
+        let wp = super::wrap(top, cause);
+        assert_eq!(format!("{:+}", wp), format!("{}: {}", top, cause));
+
+        let wp_op = super::wrap(top, op);
+        assert_eq!(format!("{:+}", wp_op), format!("{}: {}", top, cause));
+    }
+
+    #[test]
+    fn display_chain_when_message_is_wrapped() {
+
+        let msg = super::wrap("b", "a");
+        let err = super::wrap(msg, "z");
+
+        assert_eq!(format!("{:+}", err), "b: z");
+    }
+
+    #[test]
+    fn display_alternative() {
+        let cause = "cat hair in generator";
+        let top = "ship exploded";
+
+        let op = super::opaque(cause);
+        assert_eq!(format!("{:#}", op), cause);
+        assert_eq!(format!("{:+#}", op), cause);
+
+        let alt = format!("{}\nCaused by: {}", top, cause);
+
+        let wp = super::wrap(top, cause);
+        assert_eq!(format!("{:+#}", wp), alt);
+
+        let wp_op = super::wrap(top, op);
+        assert_eq!(format!("{:+#}", wp_op), alt);
+    }
+
+    #[test]
+    fn display_chain_max() {
+        let a = "a";
+        let op = super::opaque(a);
+        assert_eq!(format!("{:.0}", op), a);
+        assert_eq!(format!("{:.1}", op), a);
+        assert_eq!(format!("{:+.0}", op), a);
+        assert_eq!(format!("{:+.1}", op), a);
+
+        let wp = super::wrap("b", "a");
+        assert_eq!(format!("{:.0}", wp), "b");
+        assert_eq!(format!("{:.1}", wp), "b");
+        assert_eq!(format!("{:+.0}", wp), "b");
+        assert_eq!(format!("{:+.1}", wp), "b: a");
+
+        let wp2 = super::wrap("c", wp);
+        assert_eq!(format!("{:.0}", wp2), "c");
+        assert_eq!(format!("{:.1}", wp2), "c");
+        assert_eq!(format!("{:+.0}", wp2), "c");
+        assert_eq!(format!("{:+.1}", wp2), "c: b");
+        assert_eq!(format!("{:+.2}", wp2), "c: b: a");
     }
 }

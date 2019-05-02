@@ -1,4 +1,4 @@
-use super::ErrorRef;
+use super::{Error, ErrorRef};
 
 /// Get an `Iterator` of the whole chain of errors.
 ///
@@ -15,7 +15,7 @@ use super::ErrorRef;
 /// assert_eq!(iter.next().unwrap().to_string(), "a");
 /// assert!(iter.next().is_none());
 /// ```
-pub fn chain<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &ErrorRef> + 'a {
+pub fn chain<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &'a ErrorRef> + 'a {
     Iter { err: Some(err) }
 }
 
@@ -33,7 +33,7 @@ pub fn chain<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &ErrorRef> + 'a {
 /// assert_eq!(iter.next().unwrap().to_string(), "a");
 /// assert!(iter.next().is_none());
 /// ```
-pub fn sources<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &ErrorRef> + 'a {
+pub fn sources(err: &dyn Error) -> impl Iterator<Item = &ErrorRef> {
     Iter { err: err.source() }
 }
 

@@ -1,9 +1,9 @@
 //! `std::error::Error` extensions
 
-use std::error::Error as StdError;
+use std::error::Error;
 
-type Error = Box<dyn StdError + Send + Sync>;
-type ErrorRef = dyn StdError + 'static;
+type BoxError = Box<dyn Error + Send + Sync>;
+type ErrorRef = dyn Error + 'static;
 
 pub mod fmt;
 pub mod iter;
