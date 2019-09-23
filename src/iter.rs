@@ -33,7 +33,7 @@ pub fn chain<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &'a ErrorRef> + 'a {
 /// assert_eq!(errors::iter::root(&*err).to_string(), "a");
 ///
 /// // No chain:
-/// let root = errors::opaque("ninja cat");
+/// let root = errors::new("ninja cat");
 ///
 /// assert_eq!(errors::iter::root(&*root).to_string(), "ninja cat");
 /// ```

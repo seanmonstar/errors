@@ -1,19 +1,16 @@
 use std::fmt;
 use super::{BoxError, Error, ErrorRef};
 
-/// Wrap a value as an opaque `Error`.
-///
-/// The value is used for formatting, but not exposed as the `source`.
+/// Simple way to create an error value.
 ///
 /// # Example
 ///
 /// ```
-/// let err = errors::opaque("sound the alarm");
+/// let err = errors::new("sound the alarm");
 ///
 /// assert_eq!(err.to_string(), "sound the alarm");
-/// assert!(err.source().is_none());
 /// ```
-pub fn opaque<D>(err: D) -> BoxError
+pub fn new<D>(err: D) -> BoxError
 where
     D: fmt::Debug + fmt::Display + Send + Sync + 'static,
 {
@@ -44,6 +41,41 @@ where
     }.into()
 }
 
+/// Wrap a value as a new `Error`, while hiding its source chain.
+///
+/// The value is used for formatting, but not exposed as the `source`.
+///
+/// # Usage
+///
+/// This allows continuing to provide all relevant debug information of an
+/// error source chain, without exposing the exact types contained within.
+///
+/// Imagine wrapping an error that resulted from some timeout. A user may
+/// consider retrying an operation if the error chain contains said timeout.
+/// But perhaps the timed out operation has already been retried a few times,
+/// and you wish to return an error that no longer matches some "is_timeout"
+/// check. You can make the error "opaque", so that it still includes the
+/// timeout information in logs, but no longer is programmatically a "timeout".
+///
+/// # Example
+///
+/// ```
+/// let orig = errors::wrap("request failed", "timeout");
+///
+/// let err = errors::opaque(orig);
+///
+/// // Still prints all the information...
+/// assert_eq!(err.to_string(), "request failed: timeout");
+/// // But is no longer programatically available.
+/// assert!(err.source().is_none());
+/// ```
+pub fn opaque<E>(err: E) -> BoxError
+where
+    E: Into<BoxError>,
+{
+    Opaque(err.into()).into()
+}
+
 pub(crate) fn wrap_ref<'a>(err: &'a dyn Error) -> impl Error + 'a {
     WrapperRef {
         message: err,
@@ -56,10 +88,15 @@ struct Wrapper<D> {
     cause: Option<BoxError>,
 }
 
+
 struct WrapperRef<'a, D> {
     message: D,
     cause: Option<&'a ErrorRef>,
 }
+
+struct Opaque(BoxError);
+
+// ===== impl Wrapper =====
 
 impl<D> Wrapper<D>
 where
@@ -99,6 +136,8 @@ where
         self.cause.as_ref().map(|e| &**e as _)
     }
 }
+
+// ===== impl WrapperRef =====
 
 impl<'a, D: fmt::Debug> fmt::Debug for WrapperRef<'a, D> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -157,6 +196,32 @@ where
     }
 }
 
+// ===== impl Opaque =====
+
+impl Opaque {
+    fn wrap_ref(&self) -> WrapperRef<&ErrorRef> {
+        WrapperRef {
+            message: &*self.0,
+            cause: self.0.source(),
+        }
+    }
+}
+
+impl fmt::Debug for Opaque {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for Opaque {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.wrap_ref(), f)
+    }
+}
+
+// No source chains for opaque errors!
+impl Error for Opaque {}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -164,7 +229,7 @@ mod tests {
         let cause = "cat hair in generator";
         let top = "ship exploded";
 
-        let op = super::opaque(cause);
+        let op = super::new(cause);
         assert_eq!(format!("{}", op), cause);
 
         let wp = super::wrap(top, cause);
@@ -179,7 +244,7 @@ mod tests {
         let cause = "cat hair in generator";
         let top = "ship exploded";
 
-        let op = super::opaque(cause);
+        let op = super::new(cause);
         assert_eq!(format!("{:+}", op), cause);
 
         let wp = super::wrap(top, cause);
@@ -203,7 +268,7 @@ mod tests {
         let cause = "cat hair in generator";
         let top = "ship exploded";
 
-        let op = super::opaque(cause);
+        let op = super::new(cause);
         assert_eq!(format!("{:#}", op), cause);
         assert_eq!(format!("{:+#}", op), cause);
 
@@ -219,7 +284,7 @@ mod tests {
     #[test]
     fn display_chain_max() {
         let a = "a";
-        let op = super::opaque(a);
+        let op = super::new(a);
         assert_eq!(format!("{:.0}", op), a);
         assert_eq!(format!("{:.1}", op), a);
         assert_eq!(format!("{:+.0}", op), a);
@@ -237,5 +302,24 @@ mod tests {
         assert_eq!(format!("{:+.0}", wp2), "c");
         assert_eq!(format!("{:+.1}", wp2), "c: b");
         assert_eq!(format!("{:+.2}", wp2), "c: b: a");
+    }
+
+    // opaque()
+
+    #[test]
+    fn opaque_has_no_sources() {
+        let w = super::wrap("b", "a");
+        assert!(w.source().is_some());
+
+        let op = super::opaque(w);
+        assert!(op.source().is_none());
+    }
+
+    #[test]
+    fn opaque_displays_chain() {
+        let w = super::wrap("b", "a");
+        let op = super::opaque(w);
+
+        assert_eq!(format!("{:+}", op), "b: a");
     }
 }
