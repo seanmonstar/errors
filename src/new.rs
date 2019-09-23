@@ -65,7 +65,7 @@ where
 /// let err = errors::opaque(orig);
 ///
 /// // Still prints all the information...
-/// assert_eq!(err.to_string(), "request failed: timeout");
+/// assert_eq!(format!("{:+}", err), "request failed: timeout");
 /// // But is no longer programatically available.
 /// assert!(err.source().is_none());
 /// ```
