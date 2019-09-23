@@ -1,7 +1,34 @@
 //! Utilities for formatting `Error`s.
 
 use std::fmt;
-use super::Error;
+use super::{BoxError, Error};
+
+/// An adapter to pretty-print an error source chain.
+///
+/// # Example
+///
+/// ```no_run
+/// fn main() -> Result<(), errors::Main> {
+///     // Any program that returns a normal `impl Error`
+///     Err("ruh roh")?;
+///
+///     Ok(())
+/// }
+/// ```
+pub struct Main(BoxError);
+
+impl fmt::Debug for Main {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let err = crate::new::wrap_ref(&*self.0);
+        write!(f, "{:+#}", err)
+    }
+}
+
+impl<E: Into<BoxError>> From<E> for Main {
+    fn from(err: E) -> Main {
+        Main(err.into())
+    }
+}
 
 /// Create a `Display` adapter that outputs the error chain.
 ///

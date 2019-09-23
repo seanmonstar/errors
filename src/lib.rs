@@ -9,5 +9,6 @@ pub mod fmt;
 pub mod iter;
 mod new;
 
+pub use self::fmt::Main;
 pub use self::new::{new, opaque, wrap};
 
