@@ -139,6 +139,74 @@ where
 
 // ===== impl WrapperRef =====
 
+
+impl<'a, D> WrapperRef<'a, D>
+where
+    D: fmt::Debug + fmt::Display,
+{
+    fn joiner(&self, f: &fmt::Formatter) -> &'static str {
+        if f.alternate() {
+            "\nCaused by: "
+        } else {
+            ": "
+        }
+    }
+
+    fn fmt_all_sources(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let joiner = self.joiner(f);
+        for err in ::iter::sources(self) {
+            f.write_str(joiner)?;
+
+            // Propagate if chain ends in `Opaque`
+            if err.is::<Opaque>() {
+                return if f.alternate() {
+                    write!(f, "{:+#}", err)
+                } else {
+                    write!(f, "{:+}", err)
+                };
+            }
+
+            // else
+            write!(f, "{}", err)?;
+        }
+
+        Ok(())
+    }
+
+    fn fmt_max_sources(&self, f: &mut fmt::Formatter, mut max: usize) -> fmt::Result {
+        let joiner = self.joiner(f);
+        let mut sources = ::iter::sources(self);
+        loop {
+            if max == 0 {
+                return Ok(());
+            }
+            max -= 1;
+
+            let err = match sources.next() {
+                Some(err) => err,
+                None => break,
+            };
+
+            f.write_str(joiner)?;
+
+            // Propagate if chain ends in `Opaque`
+            if err.is::<Opaque>() {
+                return if f.alternate() {
+                    write!(f, "{:+#.*}", max, err)
+                } else {
+                    write!(f, "{:+.*}", max, err)
+                };
+            }
+
+            //else
+            write!(f, "{}", err)?;
+
+        }
+
+        Ok(())
+    }
+}
+
 impl<'a, D: fmt::Debug> fmt::Debug for WrapperRef<'a, D> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(ref cause) = self.cause {
@@ -161,25 +229,12 @@ where
         if f.sign_plus() {
             // first message with no flags...
             write!(f, "{}", self.message)?;
-            let joiner = if f.alternate() {
-                "\nCaused by: "
-            } else {
-                ": "
-            };
             // precision flag signals max source chain iteration...
             if let Some(max) = f.precision() {
-                for err in ::iter::sources(self).take(max) {
-                    f.write_str(joiner)?;
-                    write!(f, "{}", err)?;
-                }
+                self.fmt_max_sources(f, max)
             } else {
-                for err in ::iter::sources(self) {
-                    f.write_str(joiner)?;
-                    write!(f, "{}", err)?;
-                }
+                self.fmt_all_sources(f)
             }
-
-            Ok(())
         } else {
             // reset all formatter flags
             write!(f, "{}", self.message)
@@ -321,5 +376,16 @@ mod tests {
         let op = super::opaque(w);
 
         assert_eq!(format!("{:+}", op), "b: a");
+    }
+
+    #[test]
+    fn opaque_wrapped_forwards_display_chain_flags() {
+        let w = super::wrap("b", "a");
+        let w = super::wrap("c", w);
+        let op = super::opaque(w);
+        let e = super::wrap("d", op);
+
+        assert_eq!(format!("{:+}", e), "d: c: b: a");
+        assert_eq!(format!("{:+.1}", e), "d: c");
     }
 }
