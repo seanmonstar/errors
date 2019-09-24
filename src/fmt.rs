@@ -1,6 +1,6 @@
 //! Utilities for formatting `Error`s.
 
-use std::fmt;
+use std::fmt as std_fmt;
 use super::{BoxError, Error};
 
 /// An adapter to pretty-print an error source chain.
@@ -17,8 +17,8 @@ use super::{BoxError, Error};
 /// ```
 pub struct Main(BoxError);
 
-impl fmt::Debug for Main {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std_fmt::Debug for Main {
+    fn fmt(&self, f: &mut std_fmt::Formatter) -> std_fmt::Result {
         let err = crate::new::wrap_ref(&*self.0);
         write!(f, "{:+#}", err)
     }
@@ -30,38 +30,25 @@ impl<E: Into<BoxError>> From<E> for Main {
     }
 }
 
-/// Create a `Display` adapter that outputs the error chain.
+/// Create a `Display` adapter that applies the formatting rules to any error.
 ///
 /// # Example
 ///
 /// ```
-/// let err = errors::wrap("exploded", "cat hair in generator");
+/// use std::io;
 ///
-/// // Only prints top error...
-/// assert_eq!(err.to_string(), "exploded");
+/// let orig = errors::wrap("exploded", "cat hair in generator");
+/// let err = io::Error::new(io::ErrorKind::Other, orig);
 ///
-/// // What if we want the whole chain...
+/// // Foreign type might not know how to format sources...
+/// // But now it does!
 /// assert_eq!(
-///     errors::fmt::chain(&*err).to_string(),
+///     format!("{:+}", errors::fmt(&err)),
 ///     "exploded: cat hair in generator"
 /// );
 /// ```
-pub fn chain<'a>(err: &'a dyn Error) -> impl fmt::Display + 'a {
-    Chain(::new::wrap_ref(err))
-}
-
-struct Chain<T>(T);
-
-impl<T: fmt::Display> fmt::Display for Chain<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Force `sign_plus` flag on....
-        // But we otherwise want to pass the rest of the flags... ;_;
-        if let Some(max) = f.precision() {
-            write!(f, "{:+.max$}", self.0, max = max)
-        } else {
-            write!(f, "{:+}", self.0)
-        }
-    }
+pub fn fmt<'a>(err: &'a dyn Error) -> impl std_fmt::Display + 'a {
+    ::new::wrap_ref(err)
 }
 
 #[cfg(test)]
@@ -92,20 +79,20 @@ mod tests {
 
         // root
         let err = io::Error::new(io::ErrorKind::Other, a);
-        assert_eq!(format!("{}", super::chain(&err)), a);
-        assert_eq!(format!("{:.0}", super::chain(&err)), a);
-        assert_eq!(format!("{:+}", super::chain(&err)), a);
-        assert_eq!(format!("{:+.0}", super::chain(&err)), a);
+        assert_eq!(format!("{}", super::fmt(&err)), a);
+        assert_eq!(format!("{:.0}", super::fmt(&err)), a);
+        assert_eq!(format!("{:+}", super::fmt(&err)), a);
+        assert_eq!(format!("{:+.0}", super::fmt(&err)), a);
 
         // nest 1
         let err = Naive(Some(err.into()));
         let naive = "naive";
         let naive_a = "naive: a";
-        assert_eq!(format!("{}", super::chain(&err)), naive_a);
-        assert_eq!(format!("{:.0}", super::chain(&err)), naive);
-        assert_eq!(format!("{:+}", super::chain(&err)), naive_a);
-        assert_eq!(format!("{:+.0}", super::chain(&err)), naive);
-        assert_eq!(format!("{:+.1}", super::chain(&err)), naive_a);
+        assert_eq!(format!("{}", super::fmt(&err)), naive);
+        assert_eq!(format!("{:.0}", super::fmt(&err)), naive);
+        assert_eq!(format!("{:+}", super::fmt(&err)), naive_a);
+        assert_eq!(format!("{:+.0}", super::fmt(&err)), naive);
+        assert_eq!(format!("{:+.1}", super::fmt(&err)), naive_a);
     }
 
     #[test]
@@ -113,10 +100,10 @@ mod tests {
         let err = ::wrap("b", "a");
         let b = "b";
         let b_a = "b: a";
-        assert_eq!(format!("{}", super::chain(&*err)), b_a);
-        assert_eq!(format!("{:.0}", super::chain(&*err)), b);
-        assert_eq!(format!("{:+}", super::chain(&*err)), b_a);
-        assert_eq!(format!("{:+.0}", super::chain(&*err)), b);
-        assert_eq!(format!("{:+.1}", super::chain(&*err)), b_a);
+        assert_eq!(format!("{}", super::fmt(&*err)), b);
+        assert_eq!(format!("{:.0}", super::fmt(&*err)), b);
+        assert_eq!(format!("{:+}", super::fmt(&*err)), b_a);
+        assert_eq!(format!("{:+.0}", super::fmt(&*err)), b);
+        assert_eq!(format!("{:+.1}", super::fmt(&*err)), b_a);
     }
 }
