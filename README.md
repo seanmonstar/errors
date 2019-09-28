@@ -2,6 +2,9 @@
 
 `std::error::Error` extensions
 
+[![crates.io](https://img.shields.io/crates/v/errors.svg)](https://crates.io/crates/errors)
+[![Documentation](https://docs.rs/errors/badge.svg)](https://docs.rs/errors)
+
 This crate encourages usage of the `std::error::Error` trait for
 describing errors, providing the following utilities:
 
@@ -17,7 +20,8 @@ describing errors, providing the following utilities:
 
 ## Configuring Error Formatting
 
-An `Error` likely has a message, it might have a cause, and someday, it may have a trace/frame. How should they be formatted? What is a good default, and how should a user configure to their needs?
+An `Error` likely has a message, it might have a cause, and someday, it may
+have a backtrace. How can a user decide how they should be formatted?
 
 ### Output options:
 

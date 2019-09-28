@@ -1,6 +1,13 @@
 [package]
 name = "errors"
 version = "0.1.0"
+description = "std::error::Error utilities"
+readme = "README.md"
+documentation = "https://docs.rs/errors"
+repository = "https://github.com/seanmonstar/errors"
+license = "MIT"
 authors = ["Sean McArthur <sean@seanmonstar.com>"]
+keywords = ["error"]
+categories = ["rust-patterns"]
 
 [dependencies]
