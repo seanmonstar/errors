@@ -167,7 +167,7 @@ where
             }
 
             // else
-            write!(f, "{}", err)?;
+            write!(f, "{:-}", err)?;
         }
 
         Ok(())
@@ -199,7 +199,7 @@ where
             }
 
             //else
-            write!(f, "{}", err)?;
+            write!(f, "{:-}", err)?;
 
         }
 
@@ -228,7 +228,7 @@ where
         // {:+} means print the chain
         if f.sign_plus() {
             // first message with no flags...
-            write!(f, "{}", self.message)?;
+            write!(f, "{:-}", self.message)?;
             // precision flag signals max source chain iteration...
             if let Some(max) = f.precision() {
                 self.fmt_max_sources(f, max)

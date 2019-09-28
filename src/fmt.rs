@@ -106,4 +106,62 @@ mod tests {
         assert_eq!(format!("{:+.0}", super::fmt(&*err)), b);
         assert_eq!(format!("{:+.1}", super::fmt(&*err)), b_a);
     }
+
+    /// Simulate an error type that by default prefers to show one level
+    /// deep in its source chain, but wants to opt-in to behaving correctly
+    /// with `errors::fmt`.
+    #[derive(Debug)]
+    struct OneDeep(BoxError);
+
+    impl fmt::Display for OneDeep {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            if f.sign_minus() {
+                write!(f, "one deep")
+            } else {
+                write!(f, "one deep: {}", self.0)
+            }
+        }
+    }
+
+    impl Error for OneDeep {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            Some(&*self.0)
+        }
+    }
+
+    #[test]
+    fn one_deep_is_passed_minus() {
+        let orig = ::new("a");
+        let one_deep = OneDeep(orig);
+
+        assert_eq!(format!("{}", one_deep), "one deep: a");
+
+        let err = ::wrap("b", one_deep);
+        let b = "b";
+        let b_1 = "b: one deep";
+        let b_1_a = "b: one deep: a";
+        assert_eq!(format!("{}", err), b);
+        assert_eq!(format!("{:.0}", err), b);
+        assert_eq!(format!("{:+}", err), b_1_a);
+        assert_eq!(format!("{:+.0}", err), b);
+        assert_eq!(format!("{:+.1}", err), b_1);
+    }
+
+    #[test]
+    fn one_deep_opaque_is_passed_minus() {
+        let orig = ::new("a");
+        let one_deep = ::opaque(OneDeep(orig));
+
+        assert_eq!(format!("{}", one_deep), "one deep: a");
+
+        let err = ::wrap("b", one_deep);
+        let b = "b";
+        let b_1 = "b: one deep";
+        let b_1_a = "b: one deep: a";
+        assert_eq!(format!("{}", err), b);
+        assert_eq!(format!("{:.0}", err), b);
+        assert_eq!(format!("{:+}", err), b_1_a);
+        assert_eq!(format!("{:+.0}", err), b);
+        assert_eq!(format!("{:+.1}", err), b_1);
+    }
 }
