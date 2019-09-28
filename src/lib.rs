@@ -1,3 +1,6 @@
+#![deny(missing_docs)]
+#![cfg_attr(test, deny(warnings))]
+
 //! `std::error::Error` extensions
 //!
 //! This crate encourages usage of the `std::error::Error` trait for
@@ -99,7 +102,7 @@
 //! let mut cnt = 0;
 //! loop {
 //!     if let Err(e) = do_the_thing() {
-//!         if errors::iter::chain(&*e).any(|err| err.is::<TimedOut>()) {
+//!         if errors::is::<TimedOut>(&*e) {
 //!             if cnt < 3 {
 //!                 cnt += 1;
 //!                 continue; // again!
@@ -213,5 +216,6 @@ pub mod iter;
 mod new;
 
 pub use self::fmt::{fmt, Main};
+pub use self::iter::{find, is};
 pub use self::new::{new, opaque, wrap};
 
