@@ -6,20 +6,20 @@
 //! This crate encourages usage of the `std::error::Error` trait for
 //! describing errors, providing the following utilities:
 //!
-//! - **Error creation**: The [`errors::new`][new], [`errors::wrap`][wrap],
-//!   and [`errors::opaque`][opaque] functions ease the creation of simple
+//! - **Error creation**: The [`errors::new`](new), [`errors::wrap`](wrap),
+//!   and [`errors::opaque`](opaque) functions ease the creation of simple
 //!   error values.
 //! - **Error inspection**: Error source chains can be easily iterated with
-//!   [`errors::iter`][iter] iterators to find the error you're looking for.
+//!   [`errors::iter`](iter) iterators to find the error you're looking for.
 //! - **Error formatting**: The error values created with this crate provide
 //!   simple yet powerful control over the formatting of errors and their
-//!   source chains, and the [`errors::fmt::chain`][fmt::chain] adapter allows
+//!   source chains, and the [`errors::fmt`](fmt) adapter allows
 //!   foreign error values to follow along.
 //!
 //! # Creating Errors
 //!
 //! When an error condition has nothing special about besides a message, you
-//! can create one easily with [`errors::new`][new]:
+//! can create one easily with [`errors::new`](new):
 //!
 //! ```
 //! let err = errors::new("out of memory");
@@ -49,7 +49,7 @@
 //! Errors tend to wrap others to provide more context. At times, we may wish
 //! to programatically inspect the error and try to handle them depending on
 //! what failed. We can do this by inspecting the source chain of an error with
-//! the tools in [`errors::iter`][iter].
+//! the tools in [`errors::iter`](iter).
 //!
 //! Say we wanted to check for timeout errors and retry them:
 //!
@@ -68,7 +68,7 @@
 //! # impl std::error::Error for TimedOut {}
 //! # fn do_the_thing() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 //! if let Err(e) = do_the_thing() {
-//!     if errors::iter::chain(&*e).any(|err| err.is::<TimedOut>()) {
+//!     if errors::is::<TimedOut>(&*e) {
 //!         do_the_thing(); // again!
 //!     }
 //! }
