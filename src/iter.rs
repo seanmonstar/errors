@@ -30,7 +30,7 @@ use super::{Error, ErrorRef};
 ///
 /// let expected = ["c", "b", "a"];
 ///
-/// for (err, &s) in errors::iter::chain(&*err).zip(expected.iter()) {
+/// for (err, &s) in errors::iter::chain(&err).zip(expected.iter()) {
 ///     assert_eq!(err.to_string(), s);
 /// }
 /// ```
@@ -50,7 +50,7 @@ pub fn chain<'a>(err: &'a ErrorRef) -> impl Iterator<Item = &'a ErrorRef> + 'a {
 ///
 /// let expected = ["b", "a"];
 ///
-/// for (err, &s) in errors::iter::sources(&*err).zip(expected.iter()) {
+/// for (err, &s) in errors::iter::sources(&err).zip(expected.iter()) {
 ///     assert_eq!(err.to_string(), s);
 /// }
 /// ```
@@ -68,7 +68,7 @@ pub fn sources(err: &dyn Error) -> impl Iterator<Item = &ErrorRef> {
 /// let err1 = io::Error::new(io::ErrorKind::Other, "boom");
 /// let err2 = errors::wrap("ruh roh", err1);
 ///
-/// let io = errors::find::<io::Error>(&*err2).unwrap();
+/// let io = errors::find::<io::Error>(&err2).unwrap();
 /// ```
 pub fn find<E: Error + 'static>(err: &ErrorRef) -> Option<&E> {
     chain(err)
@@ -86,7 +86,7 @@ pub fn find<E: Error + 'static>(err: &ErrorRef) -> Option<&E> {
 /// assert!(errors::is::<io::Error>(&err1));
 ///
 /// let err2 = errors::wrap("ruh roh", err1);
-/// assert!(errors::is::<io::Error>(&*err2));
+/// assert!(errors::is::<io::Error>(&err2));
 /// ```
 pub fn is<E: Error + 'static>(err: &ErrorRef) -> bool {
     chain(err)
@@ -104,12 +104,12 @@ pub fn is<E: Error + 'static>(err: &ErrorRef) -> bool {
 /// // Error chain: c -> b -> a (root)
 /// let err = errors::wrap("c", errors::wrap("b", "a"));
 ///
-/// assert_eq!(errors::iter::root(&*err).to_string(), "a");
+/// assert_eq!(errors::iter::root(&err).to_string(), "a");
 ///
 /// // No chain:
 /// let root = errors::new("ninja cat");
 ///
-/// assert_eq!(errors::iter::root(&*root).to_string(), "ninja cat");
+/// assert_eq!(errors::iter::root(&root).to_string(), "ninja cat");
 /// ```
 pub fn root(err: &ErrorRef) -> &ErrorRef {
     chain(err)

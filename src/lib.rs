@@ -109,7 +109,7 @@
 //!             }
 //!
 //!             // stop retrying
-//!             return Err(errors::wrap("too many attempts", errors::opaque(e)));
+//!             return Err(errors::wrap("too many attempts", errors::opaque(e)).into());
 //!
 //!         }
 //!

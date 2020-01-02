@@ -10,14 +10,14 @@ use super::{BoxError, Error, ErrorRef};
 ///
 /// assert_eq!(err.to_string(), "sound the alarm");
 /// ```
-pub fn new<D>(err: D) -> BoxError
+pub fn new<D>(err: D) -> impl Error
 where
     D: fmt::Debug + fmt::Display + Send + Sync + 'static,
 {
     Wrapper {
         message: err,
         cause: None,
-    }.into()
+    }
 }
 
 /// Wrap an error with some additional message.
@@ -25,12 +25,14 @@ where
 /// Includes the error as the source of this wrapped error.
 ///
 /// ```
+/// use std::error::Error;
+///
 /// let err = errors::wrap("exploded", "cat hair in generator");
 ///
 /// assert_eq!(err.to_string(), "exploded");
 /// assert_eq!(err.source().unwrap().to_string(), "cat hair in generator");
 /// ```
-pub fn wrap<D, E>(message: D, cause: E) -> BoxError
+pub fn wrap<D, E>(message: D, cause: E) -> impl Error
 where
     D: fmt::Debug + fmt::Display + Send + Sync + 'static,
     E: Into<BoxError>,
@@ -38,7 +40,7 @@ where
     Wrapper {
         message,
         cause: Some(cause.into()),
-    }.into()
+    }
 }
 
 /// Wrap a value as a new `Error`, while hiding its source chain.
@@ -60,6 +62,8 @@ where
 /// # Example
 ///
 /// ```
+/// use std::error::Error;
+///
 /// let orig = errors::wrap("request failed", "timeout");
 ///
 /// let err = errors::opaque(orig);
@@ -69,11 +73,11 @@ where
 /// // But is no longer programatically available.
 /// assert!(err.source().is_none());
 /// ```
-pub fn opaque<E>(err: E) -> BoxError
+pub fn opaque<E>(err: E) -> impl Error
 where
     E: Into<BoxError>,
 {
-    Opaque(err.into()).into()
+    Opaque(err.into())
 }
 
 pub(crate) fn wrap_ref<'a>(err: &'a dyn Error) -> impl Error + 'a {
@@ -363,6 +367,8 @@ mod tests {
 
     #[test]
     fn opaque_has_no_sources() {
+        use crate::Error;
+
         let w = super::wrap("b", "a");
         assert!(w.source().is_some());
 

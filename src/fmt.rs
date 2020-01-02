@@ -100,11 +100,11 @@ mod tests {
         let err = ::wrap("b", "a");
         let b = "b";
         let b_a = "b: a";
-        assert_eq!(format!("{}", super::fmt(&*err)), b);
-        assert_eq!(format!("{:.0}", super::fmt(&*err)), b);
-        assert_eq!(format!("{:+}", super::fmt(&*err)), b_a);
-        assert_eq!(format!("{:+.0}", super::fmt(&*err)), b);
-        assert_eq!(format!("{:+.1}", super::fmt(&*err)), b_a);
+        assert_eq!(format!("{}", super::fmt(&err)), b);
+        assert_eq!(format!("{:.0}", super::fmt(&err)), b);
+        assert_eq!(format!("{:+}", super::fmt(&err)), b_a);
+        assert_eq!(format!("{:+.0}", super::fmt(&err)), b);
+        assert_eq!(format!("{:+.1}", super::fmt(&err)), b_a);
     }
 
     /// Simulate an error type that by default prefers to show one level
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn one_deep_is_passed_minus() {
         let orig = ::new("a");
-        let one_deep = OneDeep(orig);
+        let one_deep = OneDeep(orig.into());
 
         assert_eq!(format!("{}", one_deep), "one deep: a");
 
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn one_deep_opaque_is_passed_minus() {
         let orig = ::new("a");
-        let one_deep = ::opaque(OneDeep(orig));
+        let one_deep = ::opaque(OneDeep(orig.into()));
 
         assert_eq!(format!("{}", one_deep), "one deep: a");
 
